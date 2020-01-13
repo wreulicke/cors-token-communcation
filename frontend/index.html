@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Frontend</title>
+    <script crossorigin src="https://unpkg.com/react@16/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@16/umd/react-dom.development.js"></script>
+</head>
+
+<body>
+
+    <div id="content"></div>
+    <script>
+
+        const installServiceWorker = new Promise((resolve, reject) => {
+            window.addEventListener("load", () => {
+                if (navigator.serviceWorker.controller) {
+                    resolve(navigator.serviceWorker.controller)
+                } else {
+                    const controllerChange = new Promise((resolve, reject) => {
+                        navigator.serviceWorker.addEventListener('controllerchange', () => {
+                            resolve(navigator.serviceWorker.controller);
+                        });
+                    });
+                    navigator.serviceWorker.register('/service-worker.js')
+                        .then(r => navigator.serviceWorker.ready)
+                        .then(() => {
+                            if (navigator.serviceWorker.controller) {
+                                return navigator.serviceWorker.controller
+                            }
+                            return controllerChange
+                        })
+                        .then(resolve)
+                        .catch(reject)
+                }
+            })
+        })
+        window.addEventListener("DOMContentLoaded", () => {
+            function Main() {
+                const [isLogin, setState] = React.useState(false)
+                React.useEffect(() => {
+                    window.addEventListener("message", receiveMessage, false);
+                    function receiveMessage(event) {
+                        if (event.origin !== "http://localhost:8081" && event.origin !== "http://localhost:8080") {
+                            return;
+                        }
+                        if (event.data.error) {
+                        } else {
+                            setState(true)
+                            installServiceWorker
+                                .then(() => navigator.serviceWorker.controller.postMessage(event.data.token))
+                                .catch(console.log)
+                        }
+                    }
+                    const frame = document.createElement("iframe")
+                    frame.src = "http://localhost:8080/token.html"
+                    frame.style = "display: none;"
+                    document.body.appendChild(frame)
+                    frame.onload = () => {
+                        frame.contentWindow.postMessage("hi", "http://localhost:8080")
+                    }
+                }, [true])
+                if (!isLogin) {
+                    return React.createElement("a", {
+                        href: "http://localhost:8080/?r=http://localhost:8081"
+                    }, "Login")
+                }
+                return React.createElement("div", null, [
+                    React.createElement("div", null, "Logined"),
+                    React.createElement("button", {
+                        onClick() {
+                            fetch("http://localhost:8080/user-profile")
+                            .then(console.log)
+                            .catch(console.log)
+                        }
+                    }, "test")
+                ])
+            }
+            ReactDOM.render(React.createElement(Main), content)
+        })
+    </script>
+</body>
+
+</html>

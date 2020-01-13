@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Token</title>
+</head>
+<body>
+    <script>
+        window.addEventListener("message", receiveMessage, false);
+        function receiveMessage(event) {
+            if (window.parent == null) {
+                return
+            }
+            if (event.origin !== "http://localhost:8081" && event.origin !== "http://localhost:8080") {
+                return;
+            }
+            fetch("http://localhost:8080/token", {
+                method: "POST"
+            })
+            .then(r => {
+                if (r.ok) {
+                    return r.json()
+                }
+                return Promise.reject(r)
+            })
+            .then(json => {
+                event.source.postMessage({
+                    token: json.token,
+                }, "http://localhost:8081")
+            })
+            .catch(e => {
+                event.source.postMessage({ 
+                    error: e,
+                }, "http://localhost:8081")
+            })
+        }
+    </script>
+</body>
+</html>
