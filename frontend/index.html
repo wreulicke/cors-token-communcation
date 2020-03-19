@@ -14,65 +14,33 @@
 
     <div id="content"></div>
     <script>
-
-        const installServiceWorker = new Promise((resolve, reject) => {
-            window.addEventListener("load", () => {
-                if (navigator.serviceWorker.controller) {
-                    resolve(navigator.serviceWorker.controller)
-                } else {
-                    const controllerChange = new Promise((resolve, reject) => {
-                        navigator.serviceWorker.addEventListener('controllerchange', () => {
-                            resolve(navigator.serviceWorker.controller);
-                        });
-                    });
-                    navigator.serviceWorker.register('/service-worker.js')
-                        .then(r => navigator.serviceWorker.ready)
-                        .then(() => {
-                            if (navigator.serviceWorker.controller) {
-                                return navigator.serviceWorker.controller
-                            }
-                            return controllerChange
-                        })
-                        .then(resolve)
-                        .catch(reject)
-                }
-            })
-        })
         window.addEventListener("DOMContentLoaded", () => {
+            function loginFormData() {
+                const formData = new FormData()
+                formData.append("name", "admin")
+                formData.append("password", "admin")
+                return formData
+            }
             function Main() {
-                const [isLogin, setState] = React.useState(false)
-                React.useEffect(() => {
-                    window.addEventListener("message", receiveMessage, false);
-                    function receiveMessage(event) {
-                        if (event.origin !== "http://localhost:8081" && event.origin !== "http://localhost:8080") {
-                            return;
-                        }
-                        if (event.data.error) {
-                        } else {
-                            setState(true)
-                            installServiceWorker
-                                .then(() => navigator.serviceWorker.controller.postMessage(event.data.token))
-                                .catch(console.log)
-                        }
-                    }
-                    const frame = document.createElement("iframe")
-                    frame.src = "http://localhost:8080/token.html"
-                    frame.style = "display: none;"
-                    document.body.appendChild(frame)
-                    frame.onload = () => {
-                        frame.contentWindow.postMessage("hi", "http://localhost:8080")
-                    }
-                }, [true])
-                if (!isLogin) {
-                    return React.createElement("a", {
-                        href: "http://localhost:8080/?r=http://localhost:8081"
-                    }, "Login")
-                }
                 return React.createElement("div", null, [
-                    React.createElement("div", null, "Logined"),
                     React.createElement("button", {
                         onClick() {
-                            fetch("http://localhost:8080/user-profile")
+                            fetch("http://localhost:8080/login", {
+                                method: "POST",
+                                mode: 'cors',
+                                credentials: 'include',
+                                body: loginFormData()
+                            })
+                            .then(console.log)
+                            .catch(console.log)
+                        }
+                    }, "login"),
+                    React.createElement("button", {
+                        onClick() {
+                            fetch("http://localhost:8080/user-profile", {
+                                mode: 'cors',
+                                credentials: 'include'
+                            })
                             .then(console.log)
                             .catch(console.log)
                         }

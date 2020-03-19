@@ -13,59 +13,21 @@ import (
 func NewAuthorizationServer() *http.Server {
 	b := []byte("session-key")
 	store := sessions.NewCookieStore(b)
+	store.Options.SameSite = http.SameSiteLaxMode
 	authorizationRouter := chi.NewRouter()
-	authorizationRouter.Use(func(h http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			v := req.URL.Query()
-			r := v.Get("r")
-			if r == "" || req.URL.Path != "/" {
-				h.ServeHTTP(w, req)
-				return
-			}
-			sess, err := store.New(req, "test-session")
-			if err != nil {
-				log.Println("fuck", err)
-				w.WriteHeader(500)
-				return
-			}
-			log.Println(r)
-			sess.Values["r"] = r
-			sess.Save(req, w)
-			h.ServeHTTP(w, req)
-		})
-	})
-	authorizationRouter.Post("/token", func(res http.ResponseWriter, req *http.Request) {
-		sess, err := store.Get(req, "test-session")
-		if err != nil {
-			res.WriteHeader(400)
-			return
-		}
-		if sess.IsNew {
-			res.WriteHeader(400)
-			return
-		}
-		token := sess.Values["token"].(string)
-		if err := json.NewEncoder(res).Encode(map[string]string{
-			"token": token,
-		}); err != nil {
-			log.Println(err)
-		}
-	})
-
-	authorizationRouter.Options("/user-profile", func(res http.ResponseWriter, req *http.Request) {
-		res.Header().Add("Access-Control-Allow-Origin", "*")
-		res.Header().Add("Access-Control-Allow-Headers", "Authorization")
-		res.WriteHeader(200)
-	})
 	authorizationRouter.Get("/user-profile", func(res http.ResponseWriter, req *http.Request) {
-		res.Header().Add("Access-Control-Allow-Origin", "*")
-		t := req.Header.Get("Authorization")
-		log.Println(t)
-		if t != "mytoken" {
+		res.Header().Add("Access-Control-Allow-Origin", "http://localhost:8081")
+		res.Header().Add("Access-Control-Allow-Credentials", "true")
+		session, err := store.Get(req, "test-session")
+		if err != nil {
+			res.WriteHeader(500)
+			return
+		}
+		if session.IsNew {
 			res.WriteHeader(401)
 			return
 		}
-		err := json.NewEncoder(res).Encode(map[string]string{
+		err = json.NewEncoder(res).Encode(map[string]string{
 			"name": "test",
 		})
 		if err != nil {
@@ -74,31 +36,32 @@ func NewAuthorizationServer() *http.Server {
 		}
 	})
 	authorizationRouter.Post("/login", func(res http.ResponseWriter, req *http.Request) {
+		res.Header().Add("Access-Control-Allow-Origin", "http://localhost:8081")
+		res.Header().Add("Access-Control-Allow-Credentials", "true")
 		name := req.FormValue("name")
 		password := req.FormValue("password")
 		if name == "admin" && password == "admin" {
-			oldSession, err := store.Get(req, "test-session")
-			if err != nil {
-				res.WriteHeader(500)
-				return
-			}
 			sess := sessions.NewSession(store, "test-session")
 			sess.Values["authorized"] = true
 			sess.Values["token"] = "mytoken"
-			err = store.Save(req, res, sess)
+			sess.Options.SameSite = http.SameSiteLaxMode
+			err := store.Save(req, res, sess)
 			if err != nil {
 				log.Println(err)
 				res.WriteHeader(500)
 				return
 			}
-			v, ok := oldSession.Values["r"].(string)
-			if ok {
-				http.Redirect(res, req, v, 301)
-			} else {
-				http.Redirect(res, req, "http://localhost:8080/", 301)
+			res.WriteHeader(200)
+			err = json.NewEncoder(res).Encode(map[string]string{
+				"name": "test",
+			})
+			if err != nil {
+				log.Println(err)
+				res.WriteHeader(500)
+				return
 			}
 		} else {
-			http.Redirect(res, req, "http://localhost:8080/", 401)
+			res.WriteHeader(401)
 		}
 	})
 	authorizationRouter.Handle("/*", http.FileServer(http.Dir("authorization")))
